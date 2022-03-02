@@ -36,7 +36,7 @@ int main(int argc, char * argv[]) {
     char command[513];
     char *command_copy = NULL;
     char *retchar;
-    char *child_argv[100];
+    char *child_argv[100] = {0};
     char *redir_fname = NULL;
     struct Node **alias_list = newList();
     int too_long_flag = 0;
@@ -57,11 +57,13 @@ int main(int argc, char * argv[]) {
         }
         if (too_long_flag) {
             write(STDOUT_FILENO, ": command too long!\n", 20);
+            clean_up_in_loop(child_argv, &redir_fname, &command_copy);
             continue;
         }
         command_copy = strdup(command);
         if (!parse(command_copy, child_argv, &redir_fname)) {
             prompt(mode);
+            clean_up_in_loop(child_argv, &redir_fname, &command_copy);
             continue;                   // parse the command, and skip if whitespace
         }
         if (DEBUG) {
@@ -76,6 +78,7 @@ int main(int argc, char * argv[]) {
             else if (!strcmp(child_argv[0], "unalias"))
                 unalias(alias_list, child_argv);
             prompt(mode);
+            clean_up_in_loop(child_argv, &redir_fname, &command_copy);
             continue;
         }
         struct AliasPair *alias_ptr = find_alias(alias_list, child_argv[0], NULL);
@@ -90,13 +93,18 @@ int main(int argc, char * argv[]) {
             }
             *argvp = NULL;
         }
-        if (!strcmp(command, "exit") || !strcmp(command, "exit\n"))
+        if (!strcmp(command, "exit") || !strcmp(command, "exit\n")) {
+            clean_up_in_loop(child_argv, &redir_fname, &command_copy);
+            clean_up_out_loop(mode, fhandle, alias_list);
             return 0;                   // exit
+        }
         int retint = fork();            // fork the process to do the command
         
         /* fork fails */
         if (retint < 0) {
             write(STDERR_FILENO, "fork failed\n", 12);
+            clean_up_in_loop(child_argv, &redir_fname, &command_copy);
+            clean_up_out_loop(mode, fhandle, alias_list);
             return 1;
         }
         
@@ -111,6 +119,8 @@ int main(int argc, char * argv[]) {
                     strcat(out, ".\n");
                     write(STDERR_FILENO, out, strlen(out));
                     prompt(mode);
+                    clean_up_in_loop(child_argv, &redir_fname, &command_copy);
+                    clean_up_out_loop(mode, fhandle, alias_list);
                     _exit(1);
                 }
                 dup2(fileno(redir_fhandle), STDOUT_FILENO);
@@ -119,6 +129,8 @@ int main(int argc, char * argv[]) {
             strcpy(out, child_argv[0]);
             strcat(out, ": Command not found.\n");
             write(STDERR_FILENO, out, strlen(out));
+            clean_up_in_loop(child_argv, &redir_fname, &command_copy);
+            clean_up_out_loop(mode, fhandle, alias_list);
             _exit(1);                   // errors in command
         }
         
@@ -129,17 +141,9 @@ int main(int argc, char * argv[]) {
             prompt(mode);
         }
         /* clean up inside the loop */
-        char **argp = child_argv;
-        while (*argp)
-            free(*argp++);
-        if (redir_fname)
-            free(redir_fname);
-        if (command_copy)
-            free(command_copy);
+        clean_up_in_loop(child_argv, &redir_fname, &command_copy);
     }
 
     /* clean up outside the loop */
-    if (mode == BATCH)
-        fclose(fhandle);
-    clear_alias(alias_list);
+    clean_up_out_loop(mode, fhandle, alias_list);
 }

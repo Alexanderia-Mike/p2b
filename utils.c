@@ -1,5 +1,6 @@
 #include "mysh.h"
 #include "linkedList.h"
+#include "alias.h"
 
 enum STATE {PRE, IN_ALONE, IN_HEAD, IN_TAIL, IN_MID, POST, DONE};
 
@@ -27,24 +28,24 @@ int parse(char *string, char *argv[], char **f_namep) {
         /* found the redirection symbol '>' */
         char *predir = strchr(token, '>');
         if (predir && state != PRE) {
-            write(STDOUT_FILENO, "Redirection misformatted.\n", 26);
+            write(STDERR_FILENO, "Redirection misformatted.\n", 26);
             return 0;
         }
         if (predir && state == PRE) {
             if (token+strlen(token)-1 != predir && strchr(predir+1, '>')) {
-                write(STDOUT_FILENO, "Redirection misformatted.\n", 26);
+                write(STDERR_FILENO, "Redirection misformatted.\n", 26);
                 return 0;
             }
             /* tell the position of '>' in the token */
             if (strlen(token) == 1) {                       // in-alone
                 if (idx == 0) {
-                    write(STDOUT_FILENO, "Redirection misformatted.\n", 26);
+                    write(STDERR_FILENO, "Redirection misformatted.\n", 26);
                     return 0;
                 }
                 state = POST;
             } else if (predir == token) {                   // in-head
                 if (idx == 0) {
-                    write(STDOUT_FILENO, "Redirection misformatted.\n", 26);
+                    write(STDERR_FILENO, "Redirection misformatted.\n", 26);
                     return 0;
                 }
                 token ++;
@@ -70,14 +71,14 @@ int parse(char *string, char *argv[], char **f_namep) {
             *f_namep = strdup(token);
             state = DONE;
         } else {
-            write(STDOUT_FILENO, "Redirection misformatted.\n", 26);
+            write(STDERR_FILENO, "Redirection misformatted.\n", 26);
             return 0;
         }
         /* update strtok input */
         if (input != NULL)  input = NULL;
     }
     if (state != PRE && state != DONE) {
-        write(STDOUT_FILENO, "Redirection misformatted.\n", 26);
+        write(STDERR_FILENO, "Redirection misformatted.\n", 26);
         return 0;
     }
     argv[idx] = '\0';   // null-terminating the array
@@ -97,10 +98,24 @@ void print_args( char *argv[] ) {
     write(STDOUT_FILENO, "\n\n", 2);
 }
 
-void add_alias(struct Node **alias_list, char *child_argv[]) {
-    // TODO
+void clean_up_in_loop(char **child_argv, char **redir_fname_p, char **command_copy_p) {
+    while (*child_argv) {
+        free(*child_argv);
+        *child_argv = NULL;
+        child_argv ++;
+    }
+    if (*redir_fname_p) {
+        free(*redir_fname_p);
+        *redir_fname_p = NULL;
+    }
+    if (*command_copy_p) {
+        free(*command_copy_p);
+        *command_copy_p = NULL;
+    }
 }
 
-void remove_alias(struct Node **alias_list, char *child_argv[]) {
-    // TODO
+void clean_up_out_loop(int mode, FILE *fhandle, struct Node **alias_list) {
+    if (mode == BATCH)
+        fclose(fhandle);
+    clear_alias(alias_list);
 }

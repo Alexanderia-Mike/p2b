@@ -96,7 +96,7 @@ void unalias(struct Node **head, char **unalias_argv) {
             alias_name = *argvp;
             state = DONE;
         } else {                    // too many arguments
-            write(STDOUT_FILENO, 
+            write(STDERR_FILENO, 
                 "unalias: Incorrect number of arguments.\n", 40);
             return;
         }
@@ -105,14 +105,15 @@ void unalias(struct Node **head, char **unalias_argv) {
 
     /* post-processing */
     if (state == UNAME) {    // the user does not specify the name
-        write(STDOUT_FILENO, 
+        write(STDERR_FILENO, 
             "unalias: Incorrect number of arguments.\n", 40);
         return;
     } else if (state == DONE) {
         int idx;
-        find_alias(head, alias_name, &idx);
+        struct AliasPair *a_ptr = find_alias(head, alias_name, &idx);
         if (idx == -1)
             return;
+        clean(a_ptr);
         erase(head, idx);
     } else {
         write(STDERR_FILENO, "error!\n", 7);

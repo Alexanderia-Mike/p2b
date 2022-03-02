@@ -1,7 +1,0 @@
-makefile
-mysh
-mysh.c
-mysh.h
-test.sh
-test.txt
-utils.c
